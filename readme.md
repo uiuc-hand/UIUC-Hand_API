@@ -1,15 +1,13 @@
-## Welcome to the LEAP Hand SDK
+## Welcome to the UIUC Hand SDK
 
-👉 **More info:** [LEAP Hand Website](http://leaphand.com/)
+👉 **More info:** [UIUC Hand Website](http://uiuchand.com/)
 
 ---
 
 ### Software Setup
 - See these folders for setup details:  
-  - [Python API](https://github.com/leap-hand/LEAP_Hand_API/tree/main/python)  
-  - [ROS API](https://github.com/leap-hand/LEAP_Hand_API/tree/main/ros_module)  
-  - [ROS2 API](https://github.com/leap-hand/LEAP_Hand_API/tree/main/ros2_module)  
-  - [Useful Tools](https://github.com/leap-hand/LEAP_Hand_API/tree/main/useful_tools)
+  - [Python API](https://github.com/your-username/UIUC_Hand_API/tree/main/python)  
+  - [Useful Tools](https://github.com/your-username/UIUC_Hand_API/tree/main/useful_tools)
 
 ---
 
@@ -31,7 +29,7 @@
 ---
 
 ### 🤖 Functionality
-- Leap Node allows commanding joint angles in different scalings.
+- UIUC Node allows commanding joint angles in different scalings.
 - You can read **position, velocity, and current**.
 - **Query limits:**  
   - Position only: ≤ 500 Hz  
@@ -59,8 +57,8 @@
 ---
 
 ### 🔧 Useful Tools
-- **MANO → LEAP** joint angle mapping.
-- [Bimanual Dexterity for Complex Tasks](https://bidex-teleop.github.io/) shows how to use **Manus gloves** with LEAP Hand.
+- **MANO → UIUC** joint angle mapping.
+- [Bimanual Dexterity for Complex Tasks](https://bidex-teleop.github.io/) shows how to use **Manus gloves** with UIUC Hand.
 - Have a useful tool to share? **Pull requests welcome!**  
   (Or ask and I can add tools for you.)
 
@@ -73,10 +71,10 @@
   - CAD: CC BY‑NC‑SA (non‑commercial use with attribution)
 - Provided **as‑is**, without warranty.
 
-**If you use LEAP Hand in research, please cite:**
+**If you use UIUC Hand in research, please cite:**
 ```bibtex
-@article{shaw2023leaphand,
-  title={LEAP Hand: Low-Cost, Efficient, and Anthropomorphic Hand for Robot Learning},
+@article{shaw2023uiuchand,
+  title={UIUC Hand: Low-Cost, Efficient, and Anthropomorphic Hand for Robot Learning},
   author={Shaw, Kenneth and Agarwal, Ananye and Pathak, Deepak},
   journal={Robotics: Science and Systems (RSS)},
   year={2023}

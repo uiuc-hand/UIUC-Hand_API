@@ -1,4 +1,4 @@
-## Welcome to the LEAP Hand Python SDK
+## Welcome to the UIUC Hand Python SDK
 
 #### Install On Ubuntu
 - `python -m venv test_env`
