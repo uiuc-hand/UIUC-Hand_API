@@ -7,53 +7,62 @@ import threading
 from uiuc_hand_utils.dynamixel_client import *
 import uiuc_hand_utils.uiuc_hand_utils as lhu
 """UIUC Hand Control - 15 motor robotic hand with calibration support"""
+"""This can control and query the UIUC Hand
+
+#The joint numbering goes from Ring (0-2), Index(4-6), Thumb(7-9), Middle(10-12) and Pinky (13-15), from PIP, MCP Forward, MCP Side to Side for each finger.
+"""
+
+
 class UIUCNode:
     def __init__(self, calibration_mode=False):
         ####Some parameters
         # I recommend you keep the current limit from 350 for the lite, and 550 for the full hand
         # Increase KP if the hand is too weak, decrease if it's jittery.
-        self.kP = 300  # Reduced from 600 for smoother response to noisy input
+        self.kP = 200  # Reduced from 600 for smoother response to noisy input
         self.kI = 0
         self.kD = 400  # Increased from 200 for better damping of noise
-        self.curr_lim = 350  ##set this to 550 if you are using full motors!!!!
+        self.curr_lim = 300  ##set this to 550 if you are using full motors!!!!
         # Load calibration first to get dynamic values
         self.load_calibration()
         
         if not calibration_mode:
-            # Default position: max values, but every 3rd motor (3,6,9,12,15) uses midpoint, every 2nd motor (2,5,8,11,14) uses min
-            default_positions = []
-            for i in range(15):
-                if hasattr(self, 'calibrated_limits') and self.calibrated_limits and i < len(self.calibrated_limits):
-                    min_val, max_val = self.calibrated_limits[i]
-                    if (i + 1) % 3 == 0:  # Every 3rd motor (3,6,9,12,15)
-                        default_positions.append((min_val + max_val) / 2)  # midpoint
-                    elif (i + 1) % 3 == 2:  # Every 2nd motor (2,5,8,11,14)
-                        default_positions.append(min_val)  # min
-                    else:  # Every 1st motor (1,4,7,10,13)
-                        default_positions.append(max_val)  # max
-                else:
-                    # Fallback to default values if no calibration
-                    default_positions.append(3.14)  # Default middle position
+            if hasattr(self, 'calibrated_limits') and self.calibrated_limits:
+                min_vals = np.array([limits[0] for limits in self.calibrated_limits])
+                max_vals = np.array([limits[1] for limits in self.calibrated_limits])
+                
+                # Pattern: max, min, max (with special cases for motors 3 and 15)
+                default_positions = np.array([
+                    max_vals[0], min_vals[1], min_vals[2],   # Ring: PIP, MCP_F, MCP_S (special case: motor 3 uses min)
+                    max_vals[3], min_vals[4], max_vals[5],   # Index: PIP, MCP_F, MCP_S  
+                    max_vals[6], min_vals[7], max_vals[8],   # Thumb: PIP, MCP_F, MCP_S
+                    max_vals[9], min_vals[10], max_vals[11], # Middle: PIP, MCP_F, MCP_S
+                    max_vals[12], min_vals[13], min_vals[14] # Pinky: PIP, MCP_F, MCP_S (special case: motor 15 uses min)
+                ])
+            else:
+                default_positions = np.full(15, 3.14)
             
-            self.prev_pos = self.pos = self.curr_pos = np.array(default_positions)
-        else:
-            # In calibration mode, just initialize with zeros (won't be used)
-            self.prev_pos = self.pos = self.curr_pos = np.zeros(15)
+            self.prev_pos = self.pos = self.curr_pos = default_positions
         
         
         # Connect to UIUC Hand
         self.motors = list(range(1, 16))
-        self.dxl_client = DynamixelClient(self.motors, '/dev/cu.usbserial-FT66WCAW', 1000000)
+        self.dxl_client = DynamixelClient(self.motors, '/dev/ttyUSB0', 1000000)
         self.dxl_client.connect()
-        # Setup motor control
-        self.dxl_client.sync_write(self.motors, np.ones(len(self.motors))*5, 11, 1)
-        self.dxl_client.set_torque_enabled(self.motors, True)
-        self.dxl_client.sync_write(self.motors, np.ones(len(self.motors)) * self.kP, 84, 2)
-        self.dxl_client.sync_write(self.motors, np.ones(len(self.motors)) * self.kI, 82, 2)
-        self.dxl_client.sync_write(self.motors, np.ones(len(self.motors)) * self.kD, 80, 2)
-        self.dxl_client.sync_write(self.motors, np.ones(len(self.motors)) * self.curr_lim, 102, 2)
         
-        if not calibration_mode:
+        # Setup motor control mode
+        self.dxl_client.sync_write(self.motors, np.ones(len(self.motors))*5, 11, 1)
+        
+        if calibration_mode:
+            # In calibration mode, disable torque immediately to allow free movement
+            self.dxl_client.set_torque_enabled(self.motors, False)
+            print("Calibration mode: Torque disabled - motors are free to move")
+        else:
+            # Normal operation: enable torque and configure PID
+            self.dxl_client.set_torque_enabled(self.motors, True)
+            self.dxl_client.sync_write(self.motors, np.ones(len(self.motors)) * self.kP, 84, 2)
+            self.dxl_client.sync_write(self.motors, np.ones(len(self.motors)) * self.kI, 82, 2)
+            self.dxl_client.sync_write(self.motors, np.ones(len(self.motors)) * self.kD, 80, 2)
+            self.dxl_client.sync_write(self.motors, np.ones(len(self.motors)) * self.curr_lim, 102, 2)
             self.dxl_client.write_desired_pos(self.motors, self.curr_pos)
 
     def set_uiuc(self, pose):
@@ -79,13 +88,13 @@ class UIUCNode:
                 'motors': list(range(1, 16)),
                 'limits': [(float(min_val), float(max_val)) for min_val, max_val in self.calibrated_limits]
             }
-            calib_file = os.path.expanduser('~/.uiuc_hand_calibration.json')
+            calib_file = 'uiuc_hand_calibration.json'
             with open(calib_file, 'w') as f:
                 json.dump(calib_data, f, indent=2)
             print(f"Calibration saved to {calib_file}")
     
     def load_calibration(self):
-        calib_file = os.path.expanduser('~/.uiuc_hand_calibration.json')
+        calib_file = 'uiuc_hand_calibration.json'
         if os.path.exists(calib_file):
             try:
                 with open(calib_file, 'r') as f:
@@ -99,10 +108,7 @@ class UIUCNode:
     
     def calibrate_motors(self, motors_to_calibrate=list(range(1, 16))):
         print("Calibration mode - Press Enter to save and exit, Ctrl+C to exit without saving")
-        print("Torque disabled - rotate motors to find min/max positions")
-        
-        # Disable torque for calibration
-        self.dxl_client.set_torque_enabled(motors_to_calibrate, False)
+        print("Torque already disabled - rotate motors to find min/max positions")
         
         # Initialize limits
         self.calibrated_limits = [(float('inf'), float('-inf'))] * len(motors_to_calibrate)
@@ -153,10 +159,6 @@ class UIUCNode:
             print("\n❌ Calibration cancelled - not saving")
             cancelled = True
         finally:
-            # Re-enable torque
-            self.dxl_client.set_torque_enabled(motors_to_calibrate, True)
-            print("Torque re-enabled")
-            
             # Save calibration only if not cancelled
             if not cancelled:
                 print("\n✓ Calibration saved!")
@@ -171,13 +173,15 @@ class UIUCNode:
     def read_pos(self):
         return self.dxl_client.read_pos()
 def main(calibrate=False, **kwargs):
-    uiuc_hand = UIUCNode()
-    
     if calibrate:
-        # Run calibration - don't set any initial position
+        # Run calibration - torque will be disabled in initialization
+        print("Starting UIUC Hand calibration...")
         uiuc_hand = UIUCNode(calibration_mode=True)
         uiuc_hand.calibrate_motors()  # Will calibrate all 15 motors by default
         return
+    
+    # Normal operation - torque enabled and motors configured
+    uiuc_hand = UIUCNode(calibration_mode=False)
     
     while True:
         pos = uiuc_hand.read_pos()
